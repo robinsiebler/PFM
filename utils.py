@@ -37,43 +37,20 @@ def dirwalk(directory):
 		if filename.is_dir():
 			f_ext = ''
 			size = '<DIR>'
-			dir_list.append([load_icon(fullname), '[' + f_name + ']', f_ext, size, get_creation_time(fullname),
+			dir_list.append([load_file_icon(fullname), '[' + f_name + ']', f_ext, size, get_creation_time(fullname),
 			                 get_file_attributes(fullname), 0])
 		else:
 			f_ext = os.path.splitext(filename.name)[1][1:]
-			file_list.append([load_icon(fullname), f_name, f_ext, humanfriendly.format_size(f_size),
+			file_list.append([load_file_icon(fullname), f_name, f_ext, humanfriendly.format_size(f_size),
 			                  get_creation_time(fullname), get_file_attributes(fullname), f_size])
 
 	# add parent dir (for navigation purposes)
 	possible_parent = os.path.split(os.path.abspath(directory))[0]
 	if possible_parent != directory:
-		dir_list.insert(0, [load_icon(directory), '[..]', '', '<DIR>', get_creation_time(directory),
+		dir_list.insert(0, [load_file_icon(directory), '[..]', '', '<DIR>', get_creation_time(directory),
 		                    get_file_attributes(directory), 00])
 
 	return dir_list, file_list
-
-
-def get_pane_dirs():
-	"""Check the ini file, if it exists, for the directories.
-	In case of error set to the System Drive.
-
-	:return:    The directory for each pane
-	:rtype: tuple
-	"""
-
-	config_file = os.path.join(os.getcwd(), 'pfm.ini')
-	if os.path.exists(config_file):
-		l_dir = get_settings('Paths', config_file)['left_pane']
-		if l_dir is None or not os.path.exists(l_dir):
-			l_dir = os.environ['SYSTEMDRIVE']
-		r_dir = get_settings('Paths', config_file)['right_pane']
-		if r_dir is None or not os.path.exists(r_dir):
-			r_dir = os.environ['SYSTEMDRIVE']
-	else:
-		l_dir = os.environ['SYSTEMDRIVE']
-		r_dir = os.environ['SYSTEMDRIVE']
-
-	return l_dir, r_dir
 
 
 def get_creation_time(f_name):
@@ -97,6 +74,37 @@ def get_disk_space(path):
 	:rtype: tuple
 	"""
 	return psutil.disk_usage(path)
+
+
+def get_drives():
+	"""Return a list of the drives, mounts and volumes. Volumes and drives
+	are currently unhandled. Mounts is a dictionary in the form of
+	{drive letter: [drive name, drive icon]}
+
+	:return:        The volumes, mounts and drives, in that order
+	:rtype: tuple
+	"""
+	vm = Gio.VolumeMonitor.get()
+	volumes = vm.get_volumes()
+	drives = vm.get_connected_drives()
+	mounts = vm.get_mounts()
+
+	drive_dict = mount_dict = volume_dict = {}
+
+	for volume in volumes:
+		if volume:
+			print 'We have a volume! Write code to handle it!'
+
+	for drive in drives:
+		if drive:
+			print 'We have a drive! Write code to handle it!'
+
+	for mount in mounts:
+		if mount:
+			name = mount.get_name()
+			mount_dict[name[-3:-2]] = [name[:-5], load_drive_icon(mount.get_icon())]
+
+	return volume_dict, drive_dict, sorted(mount_dict)
 
 
 def get_file_attributes(filename):
@@ -142,6 +150,29 @@ def get_folder_size(path):
 	return total
 
 
+def get_pane_dirs():
+	"""Check the ini file, if it exists, for the directories.
+	In case of error set to the System Drive.
+
+	:return:    The directory for each pane
+	:rtype: tuple
+	"""
+
+	config_file = os.path.join(os.getcwd(), 'pfm.ini')
+	if os.path.exists(config_file):
+		l_dir = get_settings('Paths', config_file)['left_pane']
+		if l_dir is None or not os.path.exists(l_dir):
+			l_dir = os.environ['SYSTEMDRIVE']
+		r_dir = get_settings('Paths', config_file)['right_pane']
+		if r_dir is None or not os.path.exists(r_dir):
+			r_dir = os.environ['SYSTEMDRIVE']
+	else:
+		l_dir = os.environ['SYSTEMDRIVE']
+		r_dir = os.environ['SYSTEMDRIVE']
+
+	return l_dir, r_dir
+
+
 def get_settings(section, config_file):
 	"""Read a given section from a config file and return it.
 
@@ -167,7 +198,26 @@ def get_settings(section, config_file):
 	return dict1
 
 
-def load_icon(filename):
+def load_drive_icon(drive_icon):
+	"""Return the icon for a drive as a Pixbuf
+
+	:param Gtk.Icon drive_icon: The icon for the drive
+	:return: The Pixbuf
+	:rtype: Gsk.Pixbuf
+	"""
+
+	try:
+		if isinstance(drive_icon, Gio.ThemedIcon):
+			theme = Gtk.IconTheme.get_default()
+			return theme.choose_icon(drive_icon.get_names(), 16, 0).load_icon()
+		elif isinstance(drive_icon, Gio.FileIcon):
+			iconpath = drive_icon.get_file().get_path()
+			return GdkPixbuf.Pixbuf.new_from_file(iconpath)
+	except:
+		return
+
+
+def load_file_icon(filename):
 	"""Find the icon of the given filename as as
 	   gtk.gdk.Pixbuf. return None if the icon can't
 	   be found.
@@ -201,6 +251,20 @@ def load_icon(filename):
 	# except:
 	# 	return
 
+
+def popuplate_drive_label(mounts, drive_letter):
+	""" Return the free and total space for a drive.
+
+	:param mounts:          A dictionary containing the mount points
+	:param drive_letter:    The drive to query
+	:return:                The volume name, free and total space
+	:rtype: str
+	"""
+
+	drive_name = mounts[drive_letter][0]
+	total, used, free, percentage = get_disk_space(drive_letter + ':\\')
+
+	return '[' + drive_name + ']  ' + humanfriendly.format_size(free) + ' of ' + humanfriendly.format_size(total) + ' free'
 
 def sort_files(model, row1, row2, data):
 	pass

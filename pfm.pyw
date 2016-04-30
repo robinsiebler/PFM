@@ -12,7 +12,7 @@ import utils  # Helper functions
 import gi
 
 gi.require_version('Gtk', '3.0')
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk, Gdk, Gio
 
 # TODO: Implement threads
 # TODO: Write out ini settings
@@ -43,18 +43,35 @@ class MainWindow:
 		builder = Gtk.Builder()
 		builder.add_from_file('ui\pfm.glade')
 		builder.connect_signals(Handler())
-		window = builder.get_object("window1")
-		scrolledwindow1 = builder.get_object('scrolledwindow1')
-		scrolledwindow2 = builder.get_object('scrolledwindow2')
+		window = builder.get_object('window1')
 
-		# set the width of the panes
-		width = window.get_size()[0]
-		scrolledwindow1.set_min_content_width(width / 2)
-		scrolledwindow2.set_min_content_width(width / 2)
+		# get drives, volumes and mounts
+		self.volumes, self.mounts, self.drives = utils.get_drives()
+
+		# set up left drive bar
+		self.l_drive_letter = os.path.splitdrive(self.l_dir)[0].upper()[:1]
+		self.l_drive_combo = builder.get_object('l_drive_combo')
+		self.l_drive_list_store = builder.get_object('l_drive_list_store')
+
+		(COL_PIXBUF, COL_STRING) = range(2)
+		cell = Gtk.CellRendererText()
+		pixbuf = Gtk.CellRendererPixbuf()
+
+		self.l_drive_combo.pack_start(pixbuf, expand=False)
+		self.l_drive_combo.add_attribute(pixbuf, 'pixbuf', COL_PIXBUF)
+		self.l_drive_combo.pack_start(cell, True)
+		self.l_drive_combo.add_attribute(cell, 'text', COL_STRING)
+		self.populate_drive_combo(self.mounts, self.l_drive_list_store)
+		self.l_drive_combo.set_active_id(self.l_drive_letter)
+
+		# set up the left disk space label
+		self.l_drive_space = builder.get_object('l_drive_space_lbl')
+		self.l_drive_space.set_text(utils.popuplate_drive_label(self.mounts, self.l_drive_letter))
 
 		# get left pane components
 		self.l_store = builder.get_object('treestore1')
 		self.l_sorted_model = builder.get_object('treemodelsort1')
+		self.l_drive_space.text = utils.get_disk_space(self.l_dir)
 		# self.l_store.set_sort_func(1, utils.sort_files, None)
 		self.l_sorted_model.set_sort_column_id(1, Gtk.SortType.DESCENDING)
 		self.l_pane = builder.get_object('l_pane')
@@ -114,6 +131,7 @@ class MainWindow:
 		self.populate_tree_store(self.l_dir, self.l_store)
 
 
+
 		self.l_pane.get_selection().set_select_function(self.select_function)
 		self.l_pane_selection = self.l_pane.get_selection()
 		self.l_pane.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
@@ -123,6 +141,26 @@ class MainWindow:
 
 		cell = Gtk.CellRendererText()
 		pixbuf = Gtk.CellRendererPixbuf()
+
+		# set up right drive bar
+		self.r_drive_letter = os.path.splitdrive(self.r_dir)[0].upper()[:1]
+		self.r_drive_combo = builder.get_object('r_drive_combo')
+		self.r_drive_list_store = builder.get_object('r_drive_list_store')
+
+		(COL_PIXBUF, COL_STRING) = range(2)
+		cell = Gtk.CellRendererText()
+		pixbuf = Gtk.CellRendererPixbuf()
+
+		self.r_drive_combo.pack_start(pixbuf, expand=False)
+		self.r_drive_combo.add_attribute(pixbuf, 'pixbuf', COL_PIXBUF)
+		self.r_drive_combo.pack_start(cell, True)
+		self.r_drive_combo.add_attribute(cell, 'text', COL_STRING)
+		self.populate_drive_combo(self.mounts, self.r_drive_list_store)
+		self.r_drive_combo.set_active_id(self.r_drive_letter)
+
+		# set up the right disk space label
+		self.r_drive_space = builder.get_object('r_drive_space_lbl')
+		self.r_drive_space.set_text(utils.popuplate_drive_label(self.mounts, self.r_drive_letter))
 
 		# get right pane components
 		self.r_store = builder.get_object('treestore2')
@@ -200,6 +238,18 @@ class MainWindow:
 		key = Gdk.keyval_name(event.keyval)
 		if key == 'space':
 			self.l_pane.get_selection()
+
+	@staticmethod
+	def populate_drive_combo(mounts, store):
+		"""Add the drives and drive names to the ListStore.
+
+		:param dict mounts:         The dictionary of mount points
+		:param Gtk.ListStore store: The ListStore to populate
+		"""
+
+		for key, value in mounts.iteritems():
+			store.append([mounts[key][1], key, mounts[key][0]])
+			# store.append([mounts['C'][1], 'C', mounts['C'][0]])
 
 	@staticmethod
 	def populate_tree_store(path, store, parent=None):
