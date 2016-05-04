@@ -52,7 +52,6 @@ def dirwalk(directory):
 
 	return dir_list, file_list
 
-
 def get_creation_time(f_name):
 	"""Return the creation time for a file.
 
@@ -102,7 +101,11 @@ def get_drives():
 	for mount in mounts:
 		if mount:
 			name = mount.get_name()
-			mount_dict[name[-3:-2]] = [name[:-5], load_drive_icon(mount.get_icon())]
+			drive_letter = name[-3:-2]
+			label = name[:-5]
+			icon = load_drive_icon(mount.get_icon())
+			drive = mount.get_root().get_path()
+			mount_dict[drive_letter] = [label, icon, drive, mount]
 
 	return volume_dict, drive_dict, sorted(mount_dict)
 
@@ -261,10 +264,10 @@ def popuplate_drive_label(mounts, drive_letter):
 	:rtype: str
 	"""
 
-	drive_name = mounts[drive_letter][0]
-	total, used, free, percentage = get_disk_space(drive_letter + ':\\')
+	drive_letter = mounts[drive_letter][2]
+	total, used, free, percentage = get_disk_space(drive_letter)
 
-	return '[' + drive_name + ']  ' + humanfriendly.format_size(free) + ' of ' + humanfriendly.format_size(total) + ' free'
+	return humanfriendly.format_size(free) + ' of ' + humanfriendly.format_size(total) + ' free'
 
 def sort_files(model, row1, row2, data):
 	pass
